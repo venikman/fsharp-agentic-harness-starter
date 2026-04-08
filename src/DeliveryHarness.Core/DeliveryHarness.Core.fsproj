@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="FrontMatter.fs" />
+    <Compile Include="Workflow.fs" />
+    <Compile Include="ProcessRunner.fs" />
+    <Compile Include="Workspace.fs" />
+    <Compile Include="FileTracker.fs" />
+    <Compile Include="Agent.fs" />
+    <Compile Include="Orchestrator.fs" />
+  </ItemGroup>
+</Project>

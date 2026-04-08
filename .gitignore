@@ -1,0 +1,7 @@
+.DS_Store
+.workspaces/
+.harness/
+**/bin/
+**/obj/
+.vs/
+.idea/

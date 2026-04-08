@@ -1,0 +1,29 @@
+# Issue backlog guide
+
+This directory is the harness-owned backlog for the current starter.
+
+## Rules
+
+- Issue files are the source of truth for work intake.
+- `README.md` in this directory is documentation only and is ignored by the file tracker.
+- Runtime policy belongs in harness-owned files such as `WORKFLOW.md`, `docs/*`, and harness-managed environment variables.
+- Do not add checked-in `.pi/` settings or pi package configuration as required runtime state for this repository.
+
+## Current rollout order
+
+1. `DEMO-0002` — restore a green build baseline and add deterministic tests
+2. `DEMO-0001`, `DEMO-0003`, `DEMO-0004`, `DEMO-0010` — worker/runtime seams and safety
+3. `DEMO-0005`, `DEMO-0006`, `DEMO-0007`, `DEMO-0008` — long-running orchestration behavior
+4. `DEMO-0011`, `DEMO-0012`, `DEMO-0009` — contract refinement and external tracker integration
+5. `DEMO-9999` — final one-start autonomous backlog-completion verification gate
+
+For the fuller dependency map, read:
+- `docs/exec-plans/active/DEMO-HARNESS-BACKLOG-ROLLOUT.md`
+
+## Issue authoring reminders
+
+- Keep acceptance measurable.
+- Keep validation commands exact.
+- Record scope constraints explicitly.
+- Mention prerequisite issues in the body when a task is not safe to run early.
+- Keep file-backed tracker support working until a specific issue authorizes replacing it.
