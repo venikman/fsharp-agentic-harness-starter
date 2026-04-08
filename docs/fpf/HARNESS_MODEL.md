@@ -19,7 +19,7 @@
 | `U.MethodDescription` | `WORKFLOW.md`, `AGENTS.md`, `docs/`, exec plans |
 | `U.WorkPlan` | issue file + acceptance + validation + constraints |
 | `U.Work` | one dated issue run in one workspace |
-| `U.EvidenceRole` | tests, logs, screenshots, run record, workpad |
+| `U.EvidenceRole` | checks, logs, screenshots, run record, workpad |
 
 ## Promise vs ability vs performance
 

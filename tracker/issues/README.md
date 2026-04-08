@@ -13,7 +13,7 @@ This directory is the harness-owned backlog for the current starter.
 
 ## Current rollout order
 
-1. `DEMO-0002` — completed Wave 0 baseline reference for the green build and deterministic test suite
+1. `DEMO-0002` — completed Wave 0 baseline reference for the green build and deterministic validation bundle
 2. `DEMO-0001`, `DEMO-0003`, `DEMO-0004`, `DEMO-0010` — completed worker, workspace, tracker, and safety baseline references
 3. `DEMO-0005`, `DEMO-0006`, `DEMO-0007`, `DEMO-0008`, `DEMO-0011`, `DEMO-0012` — completed host/runtime and workflow-contract baseline references
 4. `DEMO-0009` — completed optional external-tracker baseline reference if the repo needs more than the file-backed proving path

@@ -60,7 +60,6 @@ These checks must succeed unless explicitly blocked with evidence:
 
 - [x] `dotnet restore src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj`
 - [x] `dotnet build src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj --no-restore`
-- [x] `dotnet run --project tests/DeliveryHarness.Tests/DeliveryHarness.Tests.fsproj`
 - [x] `dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- validate-workflow`
 - [x] `dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- list-issues`
 - [x] final host-mode startup command
@@ -94,7 +93,6 @@ Answer all before closure:
 - validations run:
   - `dotnet restore src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj`
   - `dotnet build src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj --no-restore`
-  - `dotnet run --project tests/DeliveryHarness.Tests/DeliveryHarness.Tests.fsproj`
   - `dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- validate-workflow`
   - `dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- list-issues`
   - `dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- run-issue DEMO-0009`

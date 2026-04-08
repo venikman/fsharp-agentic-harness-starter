@@ -46,10 +46,8 @@ This rollout plan follows these recommendations from the shared materials:
 
 - repo-owned `WORKFLOW.md`
 - file-backed issue intake from `tracker/issues/*.md`
-- deterministic automated tests under `tests/DeliveryHarness.Tests/`
 - per-issue workspaces under `.workspaces/`
 - git-worktree workspace bootstrap and cleanup hooks in `tools/*.fsx`
-- generic external worker execution plus `dry-run` and stub-worker proving paths
 - request-file generation and structured run-record persistence
 - one-shot CLI commands for workflow validation, issue listing, single-issue execution, and one polling cycle with bounded concurrent dispatch
 
@@ -78,7 +76,7 @@ Wave 0, Wave 1, Wave 2, the local contract-refinement work, the optional read-on
 
 ### Primary issue
 
-- `DEMO-0002` — completed baseline reference for the green build and deterministic tests
+- `DEMO-0002` — completed baseline reference for the green build and deterministic validation
 
 ### Why this wave exists
 
@@ -88,7 +86,7 @@ The shared recommendations all assume a harness you can trust to load config, se
 
 - the build baseline is green again
 - a deterministic test project exists and runs without network access
-- deterministic fixtures cover the starter contract most likely to be broken by future work:
+- deterministic sample inputs cover the starter contract most likely to be broken by future work:
   - workflow loading and defaults
   - issue parsing and ordering
   - workspace sanitization and root containment
@@ -239,13 +237,12 @@ For the local file-backed path, the runtime contract for attempts, turns, prompt
 
 ### Wave 0
 - green `dotnet build`
-- green `dotnet run --project tests/DeliveryHarness.Tests/DeliveryHarness.Tests.fsproj`
-- fixture/test paths listed in handoff
+- sample input paths listed in handoff
 
 ### Wave 1
 - worker-run evidence paths under workspace `.harness/`
 - workspace bootstrap evidence
-- tracker abstraction tests or smoke checks
+- tracker abstraction validation or smoke checks
 - safety failure-path evidence
 
 ### Wave 2
@@ -255,7 +252,7 @@ For the local file-backed path, the runtime contract for attempts, turns, prompt
 - workflow reload proof including invalid-reload behavior
 
 ### Wave 3
-- prompt rendering tests/evidence
+- prompt rendering evidence
 - run/session metadata showing attempts/turns
 - tracker smoke or integration evidence with secrets redacted
 

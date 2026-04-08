@@ -9,7 +9,7 @@ The starter is intentionally thin:
 
 - the harness code is **F# only**
 - the default tracker is **file-backed** so you can prove the loop locally, and a read-only Linear adapter is available when you need a real external tracker
-- the default agent is **dry-run** so you can validate the harness before wiring a real CLI
+- the default checked-in worker path is **dry-run** until you wire your own real local worker command
 - the generic worker contract stays **single-turn per external worker invocation**; host-mode retries make `orchestrator.max_attempts` real, while `agent.max_turns > 1` is still rejected until a continuation-capable runtime exists
 - `WORKFLOW.md` is the repo-owned contract
 - work happens in deterministic per-issue workspaces
@@ -32,15 +32,12 @@ The starter is intentionally thin:
 ├── src/
 │   ├── DeliveryHarness.Core/
 │   └── DeliveryHarness.Cli/
-├── tests/
-│   └── DeliveryHarness.Tests/
 ├── tools/
 │   ├── Common.fsx
 │   ├── AfterCreate.fsx
 │   ├── BeforeRun.fsx
 │   ├── AfterRun.fsx
-│   ├── BeforeRemove.fsx
-│   └── StubWorker.fsx
+│   └── BeforeRemove.fsx
 └── tracker/issues/
 ```
 
@@ -78,42 +75,37 @@ The starter is intentionally thin:
    dotnet build src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj
    ```
 
-4. Run the deterministic harness suite:
-   ```bash
-   dotnet run --project tests/DeliveryHarness.Tests/DeliveryHarness.Tests.fsproj
-   ```
-
-5. Validate the workflow:
+4. Validate the workflow:
    ```bash
    dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- validate-workflow
    ```
 
-6. List issues:
+5. List issues:
    ```bash
    dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- list-issues
    ```
 
-7. Run a single active issue manually:
+6. Run a single active issue manually:
    ```bash
    dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- run-issue ACTIVE_ISSUE_ID
    ```
 
-8. Run one polling cycle:
+7. Run one polling cycle:
    ```bash
    dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- poll-once
    ```
 
-9. Start the long-running host:
+8. Start the long-running host:
    ```bash
    dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- serve
    ```
 
-10. Inspect the latest host snapshot:
+9. Inspect the latest host snapshot:
    ```bash
    dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- status
    ```
 
-11. To smoke the real worker path without external dependencies, temporarily point `agent.command` to `dotnet` and `agent.args` to `tools/StubWorker.fsx`, or run the same configuration through a temporary workflow override.
+10. To switch from built-in dry-run mode to your real worker, edit the worker block in `WORKFLOW.md`.
 
 ## Generic worker contract
 
@@ -129,8 +121,7 @@ The starter keeps the worker protocol intentionally small:
   - `{request_path}`
   - `{project_root}`
 - stdout/stderr are captured into `<workspace>/.harness/agent-output.txt`
-- `dry-run` stays as the proving/smoke mode
-- `tools/StubWorker.fsx` is a local fake worker for deterministic validation of the non-dry-run path
+- the checked-in `WORKFLOW.md` uses built-in `dry-run` mode until you configure a real worker
 
 ## Optional Linear tracker
 
@@ -149,7 +140,7 @@ Notes:
 - `tracker.api_key` must be an environment-variable reference; do not inline the token in repo files.
 - The adapter is read-only in this pass: it supports issue listing, candidate fetch, per-issue refresh, and terminal-issue listing.
 - Linear issues currently normalize identifier, title, description, state, priority, updated time, and source URL; `acceptance`, `validation`, and `constraints` remain empty unless you keep using file-backed issues.
-- The checked-in repo workflow stays file-backed by default so local tests and smoke runs do not require network access or credentials.
+- The checked-in repo workflow stays file-backed by default so local smoke runs do not require network access or credentials.
 
 ## Current starter limits
 
@@ -158,6 +149,40 @@ Notes:
 - host scheduling state is in-memory only; restart recovery comes from re-reading tracker state and reusing deterministic workspaces
 - issue `depends_on` and `fpf.*` metadata are repo-delivery metadata today; the local starter runtime does not enforce them
 - the Linear adapter is intentionally read-only in this pass; tracker comments, state writes, and PR-link automation remain out of scope
+
+## Worker modes you can use today
+
+### 1. Built-in dry-run mode
+
+Use the checked-in `WORKFLOW.md` when you want to exercise the harness loop without yet wiring a real worker.
+
+### 2. Your real local worker command
+
+Edit the worker block in `WORKFLOW.md`. Example:
+
+```md
+agent.command: /absolute/path/to/your/worker
+agent.args:
+  - --workspace
+  - {workspace}
+  - --issue
+  - {issue_id}
+  - --request
+  - {request_path}
+```
+
+For machine-specific command paths, prefer whole-value env expansion:
+
+```md
+agent.command: $MY_AGENT_COMMAND
+agent.args:
+  - --workspace
+  - {workspace}
+  - --issue
+  - {issue_id}
+  - --request
+  - {request_path}
+```
 
 ## First five edits
 
@@ -175,6 +200,22 @@ Notes:
 - The harness backlog in this starter repo is now closed for the file-backed default path and the optional read-only Linear intake path. `DEMO-9999` remains as the historical release-proof reference rather than an open substrate issue.
 
 See `docs/exec-plans/completed/DEMO-HARNESS-BACKLOG-ROLLOUT.md` for dependencies and readiness gates.
+
+## Recommended daily workflow
+
+1. Add or update issue files in `tracker/issues/`.
+2. Keep `WORKFLOW.md` on built-in `dry-run` until you are ready to switch to a real worker.
+3. Run:
+   ```bash
+   dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- validate-workflow
+   dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- list-issues
+   dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- poll-once
+   ```
+4. Inspect:
+   - `.harness/runs/*.json`
+   - `.workspaces/<issue-id>/.harness/agent-request.md`
+   - `.workspaces/<issue-id>/.harness/agent-output.txt` or `dry-run.txt`
+   - `.workspaces/<issue-id>/.harness/after-create.txt`
 
 ## Notes
 

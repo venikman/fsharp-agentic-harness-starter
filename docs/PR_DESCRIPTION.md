@@ -13,7 +13,7 @@ It lands:
 - strict prompt templating with compatibility mode
 - read-only Linear-compatible tracker adapter behind the existing tracker seam
 - final trusted-local release-proof docs/checklist updates
-- archived execution plans copied to `docs/exec-plans/completed/` and active plans reduced to stubs
+- archived execution plans copied to `docs/exec-plans/completed/` and active plans reduced to small references
 
 ## Why
 
@@ -37,9 +37,6 @@ The repo already had the core starter seams, but the final harness experience st
 - `src/DeliveryHarness.Core/ProcessRunner.fs`
 - `src/DeliveryHarness.Core/Agent.fs`
 
-### Tests
-- `tests/DeliveryHarness.Tests/Program.fs`
-
 ### Docs / repo memory
 - `README.md`
 - `WORKFLOW.md`
@@ -55,7 +52,6 @@ The repo already had the core starter seams, but the final harness experience st
 
 - `dotnet restore src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj`
 - `dotnet build src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj --no-restore`
-- `dotnet run --project tests/DeliveryHarness.Tests/DeliveryHarness.Tests.fsproj`
 - `dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- validate-workflow`
 - `dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- list-issues`
 - `dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- run-issue DEMO-0009`

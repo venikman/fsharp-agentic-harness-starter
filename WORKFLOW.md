@@ -17,6 +17,8 @@ orchestrator.poll_interval_seconds: 60
 orchestrator.max_concurrency: 1
 orchestrator.max_attempts: 1
 
+# Default worker path stays on built-in dry-run mode until you wire a real local worker.
+# To use your real worker, replace agent.command/agent.args with your local CLI while keeping the supported tokens below.
 agent.command: dry-run
 agent.args:
   - --workspace
