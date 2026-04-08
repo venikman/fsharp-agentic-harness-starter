@@ -42,61 +42,78 @@ module Agent =
         requestPath
 
     let private replaceTokens (tokens: (string * string) list) (value: string) =
-        tokens |> List.fold (fun state (token, replacement) -> state.Replace(token, replacement)) value
+        tokens
+        |> List.fold (fun (state: string) (token, replacement) -> state.Replace(token, replacement)) value
 
-    let execute (workflow: WorkflowDefinition) (issue: TrackerIssue) (workspace: WorkspaceInfo) : Result<AgentOutcome, string> =
-        let prompt = buildPrompt workflow issue
-        let requestPath = writeRequestFile workspace prompt
-        let harnessDir = Path.Combine(workspace.Path, ".harness")
-        Directory.CreateDirectory harnessDir |> ignore
+    let private finish succeeded summary evidencePaths transcriptPath =
+        { Succeeded = succeeded
+          Summary = summary
+          EvidencePaths = evidencePaths
+          TranscriptPath = transcriptPath }
 
-        if String.Equals(workflow.Config.AgentCommand, "dry-run", StringComparison.OrdinalIgnoreCase) then
-            let transcriptPath = Path.Combine(harnessDir, "dry-run.txt")
+    let execute (workflow: WorkflowDefinition) (issue: TrackerIssue) (workspace: WorkspaceInfo) : AgentOutcome =
+        match Workspace.ensureWorkspacePath workflow workspace.Path with
+        | Error error -> finish false error [] None
+        | Ok workspacePath ->
+            let workspace = { workspace with Path = workspacePath }
+            let prompt = buildPrompt workflow issue
+            let requestPath = writeRequestFile workspace prompt
+            let harnessDir = Path.Combine(workspace.Path, ".harness")
+            Directory.CreateDirectory harnessDir |> ignore
 
-            File.WriteAllText(
-                transcriptPath,
-                String.concat
-                    Environment.NewLine
-                    [ "Dry run agent executed."
-                      sprintf "Issue: %s" issue.Id
-                      sprintf "Workspace: %s" workspace.Path
-                      sprintf "Request file: %s" requestPath
-                      "Replace agent.command in WORKFLOW.md with your real coding-agent CLI when ready." ])
+            if String.Equals(workflow.Config.AgentCommand, "dry-run", StringComparison.OrdinalIgnoreCase) then
+                let transcriptPath = Path.Combine(harnessDir, "dry-run.txt")
 
-            Ok
-                { Succeeded = true
-                  Summary = "Dry run completed. Replace agent.command with a real coding-agent CLI."
-                  EvidencePaths = [ requestPath; transcriptPath ]
-                  TranscriptPath = Some transcriptPath }
-        else
-            let tokens =
-                [ "{workspace}", workspace.Path
-                  "{issue_id}", issue.Id
-                  "{issue_title}", issue.Title
-                  "{request_path}", requestPath
-                  "{project_root}", workflow.Config.ProjectRoot ]
+                File.WriteAllText(
+                    transcriptPath,
+                    String.concat
+                        Environment.NewLine
+                        [ "Dry run agent executed."
+                          sprintf "Issue: %s" issue.Id
+                          sprintf "Workspace: %s" workspace.Path
+                          sprintf "Request file: %s" requestPath
+                          "Replace agent.command in WORKFLOW.md with your real coding-agent CLI when ready." ])
 
-            let args = workflow.Config.AgentArgs |> List.map (replaceTokens tokens)
-            let result = ProcessRunner.run workspace.Path workflow.Config.AgentTimeoutMs workflow.Config.AgentCommand args
-            let transcriptPath = Path.Combine(harnessDir, "agent-output.txt")
-
-            File.WriteAllText(
-                transcriptPath,
-                String.concat
-                    Environment.NewLine
-                    [ "stdout:"
-                      result.StdOut
-                      ""
-                      "stderr:"
-                      result.StdErr ])
-
-            if result.TimedOut then
-                Error (sprintf "Agent command timed out after %d ms." workflow.Config.AgentTimeoutMs)
-            elif result.ExitCode <> 0 then
-                Error (sprintf "Agent command exited with code %d. See %s." result.ExitCode transcriptPath)
+                finish
+                    true
+                    "Dry run completed. Replace agent.command with a real coding-agent CLI."
+                    [ requestPath; transcriptPath ]
+                    (Some transcriptPath)
             else
-                Ok
-                    { Succeeded = true
-                      Summary = "Agent command finished successfully."
-                      EvidencePaths = [ requestPath; transcriptPath ]
-                      TranscriptPath = Some transcriptPath }
+                let tokens =
+                    [ "{workspace}", workspace.Path
+                      "{issue_id}", issue.Id
+                      "{issue_title}", issue.Title
+                      "{request_path}", requestPath
+                      "{project_root}", workflow.Config.ProjectRoot ]
+
+                let args = workflow.Config.AgentArgs |> List.map (replaceTokens tokens)
+                let result = ProcessRunner.run workspace.Path workflow.Config.AgentTimeoutMs workflow.Config.AgentCommand args
+                let transcriptPath = Path.Combine(harnessDir, "agent-output.txt")
+
+                File.WriteAllText(
+                    transcriptPath,
+                    String.concat
+                        Environment.NewLine
+                        [ "stdout:"
+                          result.StdOut
+                          ""
+                          "stderr:"
+                          result.StdErr ])
+
+                let evidencePaths = [ requestPath; transcriptPath ]
+
+                if result.TimedOut then
+                    finish
+                        false
+                        (sprintf "Agent command timed out after %d ms. See %s." workflow.Config.AgentTimeoutMs transcriptPath)
+                        evidencePaths
+                        (Some transcriptPath)
+                elif result.ExitCode <> 0 then
+                    finish
+                        false
+                        (sprintf "Agent command exited with code %d. See %s." result.ExitCode transcriptPath)
+                        evidencePaths
+                        (Some transcriptPath)
+                else
+                    finish true "Agent command finished successfully." evidencePaths (Some transcriptPath)

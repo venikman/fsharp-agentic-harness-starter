@@ -15,7 +15,7 @@ workspace.cleanup_terminal: false
 
 orchestrator.poll_interval_seconds: 60
 orchestrator.max_concurrency: 1
-orchestrator.max_attempts: 2
+orchestrator.max_attempts: 1
 
 agent.command: dry-run
 agent.args:
@@ -25,13 +25,13 @@ agent.args:
   - {issue_id}
   - --request
   - {request_path}
-agent.max_turns: 4
+agent.max_turns: 1
 agent.timeout_ms: 120000
 
 hooks.after_create: dotnet fsi ../../tools/AfterCreate.fsx --workspace . --repo ../..
 hooks.before_run: dotnet fsi ../../tools/BeforeRun.fsx --workspace .
 hooks.after_run: dotnet fsi ../../tools/AfterRun.fsx --workspace .
-hooks.before_remove: dotnet fsi ../../tools/BeforeRemove.fsx --workspace .
+hooks.before_remove: dotnet fsi ../../tools/BeforeRemove.fsx --workspace . --repo ../..
 hooks.timeout_ms: 60000
 ---
 # Delivery contract
@@ -54,7 +54,16 @@ Turn an eligible issue into either:
 - Prefer small, reversible changes.
 - Keep architecture and docs aligned with the code.
 - Leave evidence for every acceptance item you claim is satisfied.
+- Treat one harness run as one attempt and one external worker invocation in this starter; `orchestrator.max_attempts` and `agent.max_turns` above `1` are not yet supported.
 - Do not introduce required `.pi/` settings, pi package configuration, or other non-harness config surfaces for this repository.
+
+## Runtime notes
+
+- The default bootstrap hook provisions a git worktree for a new workspace and leaves reused workspaces unchanged.
+- If you enable `workspace.cleanup_terminal`, the default cleanup hook removes git-worktree-backed workspaces with `git worktree remove --force`.
+- Supported `agent.args` tokens are `{workspace}`, `{issue_id}`, `{issue_title}`, `{request_path}`, and `{project_root}`.
+- Prefer whole-value environment-variable expansion such as `$MY_AGENT_COMMAND` for machine-specific command paths in front matter.
+- `orchestrator.poll_interval_seconds` is reserved for future loop-mode work and is not used by the current one-shot commands.
 
 ## Evidence bar
 

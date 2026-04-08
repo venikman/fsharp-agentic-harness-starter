@@ -3,10 +3,11 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <RollForward>Major</RollForward>
+    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DeliveryHarness.Core\DeliveryHarness.Core.fsproj" />
+    <ProjectReference Include="..\..\src\DeliveryHarness.Core\DeliveryHarness.Core.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

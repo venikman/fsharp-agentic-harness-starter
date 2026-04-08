@@ -8,6 +8,8 @@ This directory is the harness-owned backlog for the current starter.
 - `README.md` in this directory is documentation only and is ignored by the file tracker.
 - Runtime policy belongs in harness-owned files such as `WORKFLOW.md`, `docs/*`, and harness-managed environment variables.
 - Do not add checked-in `.pi/` settings or pi package configuration as required runtime state for this repository.
+- Today the starter runtime reads `id`, `title`, `state`, `priority`, `acceptance`, `validation`, `constraints`, and the body text.
+- `depends_on` and `fpf.*` fields are still useful repo-delivery metadata, but the current local starter does not schedule or block on them.
 
 ## Current rollout order
 

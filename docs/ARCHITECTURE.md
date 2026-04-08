@@ -48,8 +48,8 @@ issue file or tracker item
 ## Current baseline
 
 - tracker adapter: file-backed markdown issues
-- workspace bootstrap: repo copy in `tools/AfterCreate.fsx`
-- agent runner: generic external process with `dry-run` default
+- workspace bootstrap: git-worktree provisioning in `tools/AfterCreate.fsx`, with reused workspaces left unchanged
+- agent runner: generic external process with `dry-run` default and a local stub-worker proving path
 - orchestration mode: one-shot commands, sequential by default
 - review/merge: manual
 
@@ -57,7 +57,7 @@ issue file or tracker item
 
 1. keep repo docs concrete enough for unattended agents
 2. add deterministic tests and smoke fixtures for the harness itself
-3. replace repo-copy bootstrap with git-backed workspace provisioning
+3. tighten git-backed workspace provisioning and cleanup policy as real repos adopt the starter
 4. introduce a tracker abstraction while preserving the file adapter
 5. evolve from one-shot commands to long-running orchestration with retries and reconciliation
 6. add structured logs and optional status surfaces without making them required for correctness
