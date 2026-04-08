@@ -323,6 +323,10 @@ Before running any issue in the target repo, keep these global gates true:
 
 ## How to use this pack with the harness
 
+A ready-to-copy file-backed issue directory now exists at:
+
+- `docs/examples/markdown-parser-issue-pack/tracker/issues/`
+
 1. Create the target repo for the markdown parser library.
 2. Copy the relevant issues from this pack into that repo’s `tracker/issues/`.
 3. Replace the illustrative validation commands with the exact commands of the target repo.
