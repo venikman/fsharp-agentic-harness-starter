@@ -2,6 +2,7 @@ namespace DeliveryHarness.Core
 
 open System
 open System.IO
+open System.Threading
 
 module Workspace =
 
@@ -48,23 +49,24 @@ module Workspace =
             |> Seq.sort
             |> Seq.toList
 
-    let private runHook label cwd timeoutMs scriptOption =
+    let private runHook (workflow: WorkflowDefinition) label cwd timeoutMs scriptOption =
         match scriptOption with
         | None -> Ok ()
         | Some script ->
-            let result = ProcessRunner.runShell cwd timeoutMs script
+            let result = ProcessRunner.runShell cwd timeoutMs script CancellationToken.None
+            let sanitizedStdErr = OperatorOutput.redactForWorkflow workflow result.StdErr
 
             if result.TimedOut then
-                Error (sprintf "Hook '%s' timed out. stderr: %s" label result.StdErr)
+                Error (sprintf "Hook '%s' timed out. stderr: %s" label sanitizedStdErr)
             elif result.ExitCode <> 0 then
-                Error (sprintf "Hook '%s' failed. stderr: %s" label result.StdErr)
+                Error (sprintf "Hook '%s' failed. stderr: %s" label sanitizedStdErr)
             else
                 Ok ()
 
     let runHookInWorkspace (workflow: WorkflowDefinition) label workspacePath timeoutMs scriptOption =
         match ensureWorkspacePath workflow workspacePath with
         | Error error -> Error error
-        | Ok normalizedWorkspacePath -> runHook label normalizedWorkspacePath timeoutMs scriptOption
+        | Ok normalizedWorkspacePath -> runHook workflow label normalizedWorkspacePath timeoutMs scriptOption
 
     let runHookBestEffortInWorkspace (workflow: WorkflowDefinition) label workspacePath timeoutMs scriptOption =
         match runHookInWorkspace workflow label workspacePath timeoutMs scriptOption with

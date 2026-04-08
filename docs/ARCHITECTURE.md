@@ -26,7 +26,7 @@ Do not collapse these contexts. Product code stays generic; repo-delivery files 
   - operator entry points
   - workflow validation
   - manual issue execution
-  - polling and future service-host commands
+  - one-shot polling plus long-running host/status commands
 
 - `tools/*.fsx`
   - replaceable workspace lifecycle hooks
@@ -47,20 +47,24 @@ issue file or tracker item
 
 ## Current baseline
 
-- tracker adapter: file-backed markdown issues
+- tracker seam: `DeliveryHarness.Core/Tracker.fs` defines the harness-owned port; the default adapter remains file-backed markdown issues and a read-only Linear adapter is now available for external intake
 - workspace bootstrap: git-worktree provisioning in `tools/AfterCreate.fsx`, with reused workspaces left unchanged
 - agent runner: generic external process with `dry-run` default and a local stub-worker proving path
-- orchestration mode: one-shot commands, sequential by default
+- orchestration mode: `run-issue`, `poll-once`, and `serve`; host mode keeps in-memory running/retrying/retired state, enforces bounded concurrency, performs linear retry backoff, and reconciles tracker state on each tick
+- observability: structured host events plus a JSON status snapshot live under `.harness/runtime/`
+- workflow contract: prompt templates support strict `{{ ... }}` variables with compatibility mode, and host mode hot-reloads future ticks/runs while preserving a last-known-good config on invalid reloads
+- safety/output policy: hooks and worker launches revalidate workspace containment, and operator-visible output is deterministically redacted for workflow-configured secret-like env values
+- run records: structured evidence including real attempt numbers, explicit turn numbers, performer/context metadata, and hook outcomes
 - review/merge: manual
 
 ## Planned evolution
 
 1. keep repo docs concrete enough for unattended agents
-2. add deterministic tests and smoke fixtures for the harness itself
-3. tighten git-backed workspace provisioning and cleanup policy as real repos adopt the starter
-4. introduce a tracker abstraction while preserving the file adapter
-5. evolve from one-shot commands to long-running orchestration with retries and reconciliation
-6. add structured logs and optional status surfaces without making them required for correctness
+2. extend deterministic tests and smoke fixtures as the harness contract evolves
+3. keep git-backed workspace provisioning and cleanup policy explicit as real repos adopt the starter
+4. preserve the file-backed proving path as the default local contract even when real tracker adapters such as the current read-only Linear path are enabled
+5. prove the final trusted-local `DEMO-9999` startup/review bundle against the now-landed host/runtime contract
+6. add richer continuation-capable worker semantics only if the repo truly needs multi-turn orchestration
 
 ## Pi integration boundary
 

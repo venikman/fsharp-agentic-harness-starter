@@ -10,8 +10,11 @@ This repository is a harness product first. Every review-ready change must leave
 | build | `dotnet build src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj --no-restore` | yes | console output |
 | workflow validation | `dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- validate-workflow` | yes | console output |
 | issue listing | `dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- list-issues` | yes | console output |
-| issue-run smoke | `dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- run-issue DEMO-0001` | when agent/workspace/orchestration behavior changes | console output and generated `.harness/runs/*.json` path |
-| tests | `dotnet test` | yes | console output |
+| issue-run smoke | `dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- run-issue ACTIVE_ISSUE_ID` | when agent/workspace/orchestration behavior changes | console output and generated `.harness/runs/*.json` path |
+| behavioral suite | `dotnet run --project tests/DeliveryHarness.Tests/DeliveryHarness.Tests.fsproj` | yes | console output |
+
+- `dotnet test` is not the canonical behavioral-suite entry point in this repo; the deterministic harness tests are an executable project.
+- Use `list-issues` to choose an id currently in `tracker.active_states`; `run-issue` rejects non-active issues.
 
 ## Evidence rules
 
@@ -20,6 +23,7 @@ This repository is a harness product first. Every review-ready change must leave
 - If orchestration behavior changes, include a short before/after note for operator-visible behavior.
 - If failure-path behavior changes, include either a failed run record path or automated test evidence showing what artifacts were preserved.
 - If worker-command behavior changes, include either deterministic test evidence using the local stub worker or a local stub-worker smoke run with generated artifact paths.
+- If host-mode, reload, or observability behavior changes, include the relevant `.harness/runtime/status.json` and/or `.harness/runtime/host-events.jsonl` artifact paths from a bounded local `serve` smoke or equivalent deterministic test evidence.
 - If workflow/config contracts change, update the matching docs in the same run.
 - If real tracker or real agent checks cannot run because credentials or tooling are unavailable, record that explicitly as a blocker or skipped validation.
 

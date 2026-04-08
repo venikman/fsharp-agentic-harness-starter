@@ -15,7 +15,7 @@ acceptance:
   - Replace with measurable acceptance criteria
 validation:
   - dotnet build src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj
-  - dotnet test
+  - dotnet run --project tests/DeliveryHarness.Tests/DeliveryHarness.Tests.fsproj
   - dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- validate-workflow
 constraints:
   - Replace with scope constraints

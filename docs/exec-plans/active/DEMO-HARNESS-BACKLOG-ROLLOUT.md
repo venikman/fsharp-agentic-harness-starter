@@ -46,30 +46,22 @@ This rollout plan follows these recommendations from the shared materials:
 
 - repo-owned `WORKFLOW.md`
 - file-backed issue intake from `tracker/issues/*.md`
+- deterministic automated tests under `tests/DeliveryHarness.Tests/`
 - per-issue workspaces under `.workspaces/`
-- lifecycle hooks in `tools/*.fsx`
-- request-file generation and run-record persistence
-- one-shot CLI commands for workflow validation, issue listing, single-issue execution, and one polling cycle
+- git-worktree workspace bootstrap and cleanup hooks in `tools/*.fsx`
+- generic external worker execution plus `dry-run` and stub-worker proving paths
+- request-file generation and structured run-record persistence
+- one-shot CLI commands for workflow validation, issue listing, single-issue execution, and one polling cycle with bounded concurrent dispatch
 
 ### What is still missing or immature
 
-- green build baseline
-- deterministic automated tests
-- real external worker integration as the normal path
-- git-backed workspace provisioning
-- tracker abstraction and non-file tracker support
-- long-running orchestration with retries and reconciliation
-- structured logs and runtime status
-- workflow hot reload
-- real attempt/turn semantics
-- strict prompt templating
+- non-file tracker support
+- final trusted-local release proof and completed `DEMO-9999` checklist evidence
+- continuation-capable multi-turn worker support beyond the current single-turn generic worker contract
 
-### Current known blocker
+### Current leverage point
 
-`DEMO-0002` must start by restoring a green build baseline. Current observed local failure:
-- `dotnet build src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj`
-- `src/DeliveryHarness.Core/Agent.fs` reports `FS0072`
-- `src/DeliveryHarness.Core/ProcessRunner.fs` produces reserved-identifier warnings for `process`
+Wave 0, Wave 1, Wave 2, the local contract-refinement work, the optional read-only Linear tracker path, and the final trusted-local `DEMO-9999` release-proof pass are now landed in this starter repo. Remaining work is optional repo-specific evolution, not unfinished starter substrate.
 
 ## Non-negotiable boundaries
 
@@ -82,42 +74,39 @@ This rollout plan follows these recommendations from the shared materials:
 
 ## Phase plan
 
-## Wave 0 — baseline and conformance seed
+## Wave 0 — completed baseline and conformance seed
 
 ### Primary issue
 
-- `DEMO-0002` — restore a green build baseline and add deterministic tests
+- `DEMO-0002` — completed baseline reference for the green build and deterministic tests
 
 ### Why this wave exists
 
-The shared recommendations all assume a harness you can trust to load config, see work, and enforce basic safety rules. Right now the repo has the right shape but not yet the validation spine.
+The shared recommendations all assume a harness you can trust to load config, see work, and enforce basic safety rules. This repository now has that baseline spine, and later work should extend it rather than re-describe it as missing.
 
 ### Detailed outcomes
 
-- current build failure is fixed with the smallest credible change
-- a test project exists and runs without network access
+- the build baseline is green again
+- a deterministic test project exists and runs without network access
 - deterministic fixtures cover the starter contract most likely to be broken by future work:
   - workflow loading and defaults
   - issue parsing and ordering
   - workspace sanitization and root containment
-  - run-record writing and/or dry-run execution artifacts
+  - run-record writing, worker-path artifacts, and failure preservation
 - `docs/QUALITY.md` and issue validations explicitly reference the new test path
 
 ### Exit gate
 
-Do not start higher-wave issues until:
-- `dotnet build` is green
-- `dotnet test` is green
-- the repo has a stable baseline for future refactors
+Satisfied in the current repo. Later waves should preserve this baseline.
 
 ## Wave 1 — worker/runtime seams and safety
 
 ### Issues
 
-- `DEMO-0001` — real external agent CLI support
-- `DEMO-0003` — git-based workspace provisioning
-- `DEMO-0004` — tracker abstraction
-- `DEMO-0010` — stronger workspace/process/secret safety
+- `DEMO-0001` — completed baseline reference for generic external agent CLI support
+- `DEMO-0003` — completed baseline reference for git-based workspace provisioning
+- `DEMO-0004` — completed baseline reference for tracker abstraction
+- `DEMO-0010` — completed baseline reference for stronger workspace/process/secret safety
 
 ### Why this wave exists
 
@@ -126,15 +115,14 @@ The recommendations point to a clean separation between orchestration, workspace
 ### Detailed outcomes by issue
 
 #### `DEMO-0001`
-- preserve `dry-run` as a proving path
-- make external command execution a first-class path
+- preserve the already-landed `dry-run` and generic external-command contract
 - keep configuration harness-owned
-- ensure request-file and workspace information are explicit inputs
+- avoid re-opening the worker path as if it were still missing
 
 #### `DEMO-0003`
-- remove repo-copy bootstrap as the default long-term model
-- adopt a git-backed bootstrap with documented reuse/reset behavior
+- preserve the already-landed git-worktree bootstrap and documented reuse policy
 - keep workspace prep in hooks rather than pushing repo-specific logic into core modules
+- extend validation or safety only where the current hook boundary is insufficient
 
 #### `DEMO-0004`
 - move orchestration away from direct `FileTracker` dependency
@@ -146,33 +134,19 @@ The recommendations point to a clean separation between orchestration, workspace
 - make hook/process failure behavior operator-visible and testable
 - revalidate workspace-root containment before execution, not just during creation
 
-### Safe parallelism inside Wave 1
-
-Recommended pairs:
-- `DEMO-0001` with `DEMO-0003`
-- `DEMO-0004` with `DEMO-0010`
-
-Avoid concurrent work if both changes touch the same seam at once, especially:
-- hook execution behavior
-- workspace lifecycle internals
-- tracker-facing orchestration calls
 
 ### Exit gate
 
-Do not start Wave 2 until:
-- a real worker command path exists
-- workspace provisioning is no longer repo-copy dependent
-- tracker orchestration depends on an abstraction seam
-- safety rules are explicit and tested
+Satisfied in the current repo. Wave 2 is now the active frontier.
 
-## Wave 2 — long-running orchestration lifecycle
+## Wave 2 — completed long-running orchestration lifecycle baseline
 
 ### Issues
 
-- `DEMO-0005` — long-running orchestrator mode and retry backoff
-- `DEMO-0006` — active reconciliation and terminal cleanup
-- `DEMO-0007` — structured logs and status surface
-- `DEMO-0008` — workflow hot reload with last-known-good behavior
+- `DEMO-0005` — completed baseline reference for long-running host mode and retry backoff
+- `DEMO-0006` — completed baseline reference for active reconciliation and terminal cleanup
+- `DEMO-0007` — completed baseline reference for structured logs and status surface
+- `DEMO-0008` — completed baseline reference for workflow hot reload with last-known-good behavior
 
 ### Why this wave exists
 
@@ -182,6 +156,7 @@ The shared recommendations and Symphony spec both center the orchestrator as a l
 
 #### `DEMO-0005`
 - add a durable host/daemon mode beyond `poll-once`
+- reuse the existing bounded-concurrency `poll-once` semantics inside the host loop
 - make `orchestrator.max_attempts` and retry timing real runtime behavior
 - preserve `poll-once` for debugging and smoke validation
 
@@ -208,19 +183,15 @@ The shared recommendations and Symphony spec both center the orchestrator as a l
 
 ### Exit gate
 
-Do not start Wave 3 until:
-- the harness has a credible long-running mode
-- retries and reconciliation are not just documentation
-- operator-visible status exists
-- reload behavior no longer requires service restart for routine workflow edits
+Satisfied in the current repo. Later work should treat host mode, reconciliation, status/logs, and last-known-good reload behavior as baseline semantics rather than future aspirations.
 
-## Wave 3 — contract refinement and external tracker integration
+## Wave 3 — local contract refinement and optional external tracker integration landed
 
 ### Issues
 
-- `DEMO-0011` — explicit turn semantics and meaningful `agent.max_turns`
-- `DEMO-0012` — strict prompt templating with issue/attempt variables
-- `DEMO-0009` — Linear-compatible tracker adapter
+- `DEMO-0011` — completed baseline reference for explicit attempt/turn semantics and honest `agent.max_turns`
+- `DEMO-0012` — completed baseline reference for strict prompt templating with issue/attempt variables
+- `DEMO-0009` — completed baseline reference for read-only Linear-compatible tracker intake
 
 ### Why this wave exists
 
@@ -245,10 +216,7 @@ Only after worker execution and long-running orchestration are real should the h
 
 ### Exit gate
 
-Wave 3 is complete when:
-- the runtime contract for attempts, turns, and prompts matches actual behavior
-- a real tracker can feed the harness without replacing the proving path
-- external integration does not weaken the documented trust boundary
+For the local file-backed path, the runtime contract for attempts, turns, prompts, retries, reload, and observability now matches actual behavior. `DEMO-0009` is now a completed optional baseline reference for repos that need a real external tracker without replacing the proving path.
 
 ## Dependency map
 
@@ -271,7 +239,7 @@ Wave 3 is complete when:
 
 ### Wave 0
 - green `dotnet build`
-- green `dotnet test`
+- green `dotnet run --project tests/DeliveryHarness.Tests/DeliveryHarness.Tests.fsproj`
 - fixture/test paths listed in handoff
 
 ### Wave 1
@@ -293,7 +261,7 @@ Wave 3 is complete when:
 
 ## Immediate next action
 
-Start with `DEMO-0002` using a bounded issue-level execution plan. The goal is not to add more capability yet; it is to make future capability work safe and reviewable.
+No mandatory starter-substrate backlog remains. Use this repo as the baseline, or fork/extend it with repo-specific product-delivery work and any optional tracker/worker capabilities your target environment actually needs.
 
 ## Risks
 

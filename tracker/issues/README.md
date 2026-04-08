@@ -13,11 +13,11 @@ This directory is the harness-owned backlog for the current starter.
 
 ## Current rollout order
 
-1. `DEMO-0002` — restore a green build baseline and add deterministic tests
-2. `DEMO-0001`, `DEMO-0003`, `DEMO-0004`, `DEMO-0010` — worker/runtime seams and safety
-3. `DEMO-0005`, `DEMO-0006`, `DEMO-0007`, `DEMO-0008` — long-running orchestration behavior
-4. `DEMO-0011`, `DEMO-0012`, `DEMO-0009` — contract refinement and external tracker integration
-5. `DEMO-9999` — final one-start autonomous backlog-completion verification gate
+1. `DEMO-0002` — completed Wave 0 baseline reference for the green build and deterministic test suite
+2. `DEMO-0001`, `DEMO-0003`, `DEMO-0004`, `DEMO-0010` — completed worker, workspace, tracker, and safety baseline references
+3. `DEMO-0005`, `DEMO-0006`, `DEMO-0007`, `DEMO-0008`, `DEMO-0011`, `DEMO-0012` — completed host/runtime and workflow-contract baseline references
+4. `DEMO-0009` — completed optional external-tracker baseline reference if the repo needs more than the file-backed proving path
+5. `DEMO-9999` — completed trusted-local release-proof reference for the final one-start verification pass
 
 For the fuller dependency map, read:
 - `docs/exec-plans/active/DEMO-HARNESS-BACKLOG-ROLLOUT.md`

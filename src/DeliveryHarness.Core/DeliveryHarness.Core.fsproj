@@ -6,11 +6,16 @@
 
   <ItemGroup>
     <Compile Include="Types.fs" />
+    <Compile Include="OperatorOutput.fs" />
     <Compile Include="FrontMatter.fs" />
+    <Compile Include="PromptTemplate.fs" />
     <Compile Include="ProcessRunner.fs" />
     <Compile Include="Workspace.fs" />
     <Compile Include="Workflow.fs" />
     <Compile Include="FileTracker.fs" />
+    <Compile Include="LinearTracker.fs" />
+    <Compile Include="Tracker.fs" />
+    <Compile Include="Observability.fs" />
     <Compile Include="Agent.fs" />
     <Compile Include="Orchestrator.fs" />
   </ItemGroup>
