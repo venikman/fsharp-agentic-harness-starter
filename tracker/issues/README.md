@@ -20,7 +20,7 @@ This directory is the harness-owned backlog for the current starter.
 5. `DEMO-9999` — completed trusted-local release-proof reference for the final one-start verification pass
 
 For the fuller dependency map, read:
-- `docs/exec-plans/active/DEMO-HARNESS-BACKLOG-ROLLOUT.md`
+- `docs/exec-plans/completed/DEMO-HARNESS-BACKLOG-ROLLOUT.md`
 
 ## Issue authoring reminders
 

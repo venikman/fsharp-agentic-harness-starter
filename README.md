@@ -174,7 +174,7 @@ Notes:
 - Wave 2 and the local contract-refinement work are now landed: `DEMO-0005`, `DEMO-0006`, `DEMO-0007`, `DEMO-0008`, `DEMO-0011`, and `DEMO-0012` provide host mode, reconciliation, observability, reload behavior, honest attempt/turn semantics, and strict prompt templating.
 - The harness backlog in this starter repo is now closed for the file-backed default path and the optional read-only Linear intake path. `DEMO-9999` remains as the historical release-proof reference rather than an open substrate issue.
 
-See `docs/exec-plans/active/DEMO-HARNESS-BACKLOG-ROLLOUT.md` for dependencies and readiness gates.
+See `docs/exec-plans/completed/DEMO-HARNESS-BACKLOG-ROLLOUT.md` for dependencies and readiness gates.
 
 ## Notes
 
