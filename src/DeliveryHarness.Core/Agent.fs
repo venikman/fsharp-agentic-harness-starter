@@ -2,6 +2,7 @@ namespace DeliveryHarness.Core
 
 open System
 open System.IO
+open System.Text.Json
 open System.Threading
 
 module Agent =
@@ -18,11 +19,28 @@ module Agent =
         tokens
         |> List.fold (fun (state: string) (token, replacement) -> state.Replace(token, replacement)) value
 
-    let private finish succeeded cancelled summary evidencePaths transcriptPath =
+    let private writeOutcomeFile (workspace: WorkspaceInfo) succeeded cancelled summary transcriptPath =
+        let harnessDir = Path.Combine(workspace.Path, ".harness")
+        Directory.CreateDirectory harnessDir |> ignore
+
+        let outcomePath = Path.Combine(harnessDir, "agent-outcome.json")
+
+        let payload =
+            {| succeeded = succeeded
+               cancelled = cancelled
+               summary = summary
+               transcript_path = transcriptPath |}
+
+        File.WriteAllText(outcomePath, JsonSerializer.Serialize(payload, JsonSerializerOptions(WriteIndented = true)))
+        outcomePath
+
+    let private finish (workspace: WorkspaceInfo) succeeded cancelled summary evidencePaths transcriptPath =
+        let outcomePath = writeOutcomeFile workspace succeeded cancelled summary transcriptPath
+
         { Succeeded = succeeded
           Cancelled = cancelled
           Summary = summary
-          EvidencePaths = evidencePaths
+          EvidencePaths = outcomePath :: evidencePaths
           TranscriptPath = transcriptPath }
 
     let execute
@@ -35,22 +53,22 @@ module Agent =
         : AgentOutcome
         =
         match Workspace.ensureWorkspacePath workflow workspace.Path with
-        | Error error -> finish false false error [] None
+        | Error error -> finish workspace false false error [] None
         | Ok workspacePath ->
             let workspace = { workspace with Path = workspacePath }
 
             if cancellationToken.IsCancellationRequested then
-                finish false true "Run cancelled before request generation." [] None
+                finish workspace false true "Run cancelled before request generation." [] None
             else
                 match PromptTemplate.render workflow issue attemptNumber turnNumber with
-                | Error error -> finish false false error [] None
+                | Error error -> finish workspace false false error [] None
                 | Ok prompt ->
                     let requestPath = writeRequestFile workspace prompt
                     let harnessDir = Path.Combine(workspace.Path, ".harness")
                     Directory.CreateDirectory harnessDir |> ignore
 
                     if cancellationToken.IsCancellationRequested then
-                        finish false true "Run cancelled before agent launch." [ requestPath ] None
+                        finish workspace false true "Run cancelled before agent launch." [ requestPath ] None
                     elif String.Equals(workflow.Config.AgentCommand, "dry-run", StringComparison.OrdinalIgnoreCase) then
                         let transcriptPath = Path.Combine(harnessDir, "dry-run.txt")
 
@@ -67,6 +85,7 @@ module Agent =
                                   "Replace agent.command in WORKFLOW.md with your real coding-agent CLI when ready." ])
 
                         finish
+                            workspace
                             true
                             false
                             "Dry run completed. Replace agent.command with a real coding-agent CLI."
@@ -107,9 +126,10 @@ module Agent =
                         let evidencePaths = [ requestPath; transcriptPath ]
 
                         if result.Cancelled then
-                            finish false true (sprintf "Agent command was cancelled. See %s." transcriptPath) evidencePaths (Some transcriptPath)
+                            finish workspace false true (sprintf "Agent command was cancelled. See %s." transcriptPath) evidencePaths (Some transcriptPath)
                         elif result.TimedOut then
                             finish
+                                workspace
                                 false
                                 false
                                 (sprintf "Agent command timed out after %d ms. See %s." workflow.Config.AgentTimeoutMs transcriptPath)
@@ -117,10 +137,11 @@ module Agent =
                                 (Some transcriptPath)
                         elif result.ExitCode <> 0 then
                             finish
+                                workspace
                                 false
                                 false
                                 (sprintf "Agent command exited with code %d. See %s." result.ExitCode transcriptPath)
                                 evidencePaths
                                 (Some transcriptPath)
                         else
-                            finish true false "Agent command finished successfully." evidencePaths (Some transcriptPath)
+                            finish workspace true false "Agent command finished successfully." evidencePaths (Some transcriptPath)

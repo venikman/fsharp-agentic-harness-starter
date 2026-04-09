@@ -122,6 +122,7 @@ The starter keeps the worker protocol intentionally small:
   - `{request_path}`
   - `{project_root}`
 - stdout/stderr are captured into `<workspace>/.harness/agent-output.txt`
+- the harness writes `<workspace>/.harness/agent-outcome.json` before `hooks.after_run` so repo-owned hooks can distinguish success, failure, and cancellation
 - the checked-in `WORKFLOW.md` uses built-in `dry-run` mode until you configure a real worker
 
 ## Optional Linear tracker
@@ -248,6 +249,7 @@ See `docs/exec-plans/completed/DEMO-HARNESS-BACKLOG-ROLLOUT.md` for dependencies
 - If you enable `workspace.cleanup_terminal`, the default cleanup hook removes git-worktree-backed workspaces with `git worktree remove --force`.
 - The file tracker remains deliberate as the default path. It lets you debug your harness before you involve external APIs, credentials, and rate limits, even though the read-only Linear adapter now exists.
 - Runtime policy stays in harness-owned files. This repo should not depend on checked-in `.pi/` settings for correctness.
+- Repo-owned `after_run` hooks can inspect `.harness/agent-outcome.json` when they need bounded post-run behavior such as local handoff or landing logic.
 - Prefer whole-value environment-variable expansion in `WORKFLOW.md` for machine-specific command paths.
 - Use `list-issues` to choose an id from `tracker.active_states`; `run-issue` also rejects file-backed issues with unresolved `depends_on` prerequisites.
 - Run records under `.harness/runs/` are written for both success and failure paths when a run attempt starts.

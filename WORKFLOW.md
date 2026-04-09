@@ -71,6 +71,7 @@ Turn an eligible issue into either:
 - Supported `agent.args` tokens are `{workspace}`, `{issue_id}`, `{issue_title}`, `{request_path}`, and `{project_root}`.
 - Prefer whole-value environment-variable expansion such as `$MY_AGENT_COMMAND` for machine-specific command paths in front matter.
 - Active runs keep the workflow they were dispatched with; reloads only affect future ticks and future runs.
+- The harness writes `.harness/agent-outcome.json` before `hooks.after_run` so repo-owned after-run hooks can distinguish success, failure, and cancellation.
 - If `hooks.after_run` fails, the run is marked failed and the run record captures the hook outcome.
 
 ## Tracker adapter notes
@@ -129,6 +130,7 @@ Turn an eligible issue into either:
 ## Operator-visible output policy
 
 - Hook and worker output is preserved in workspace-local harness artifacts, with no extra truncation applied by default in this starter.
+- `agent-outcome.json` is a harness-owned workspace artifact for post-run hook coordination; it is not a replacement for the final run record under `.harness/runs/`.
 - Secret-like environment values resolved from whole-token `$VAR` references in workflow front matter are redacted as `[REDACTED]` before operator-visible hook errors, run summaries, and default worker transcripts are written.
 - Prompt body and issue text are repo-authored content, not secret-safe channels. Do not place credentials there.
 

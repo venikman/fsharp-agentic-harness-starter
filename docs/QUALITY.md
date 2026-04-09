@@ -20,7 +20,7 @@ This repository is a harness product first. Every review-ready change must leave
 - Include relevant generated artifact paths such as workspace `.harness/*` files or run records under `.harness/runs/`.
 - If orchestration behavior changes, include a short before/after note for operator-visible behavior and any tracker-state or dependency-admission changes.
 - If failure-path behavior changes, include either a failed run record path or a bounded local smoke run showing what artifacts were preserved.
-- If worker-command behavior changes, include a bounded local smoke run with generated request, transcript, and run-record paths.
+- If worker-command behavior changes, include a bounded local smoke run with generated request, transcript, `agent-outcome.json`, and run-record paths.
 - If host-mode, reload, or observability behavior changes, include the relevant `.harness/runtime/status.json` and/or `.harness/runtime/host-events.jsonl` artifact paths from a bounded local `serve` smoke, plus the affected tracker issue files when state transitions are part of the contract.
 - If workflow/config contracts change, update the matching docs in the same run.
 - If real tracker or real agent checks cannot run because credentials or tooling are unavailable, record that explicitly as a blocker or skipped validation.
