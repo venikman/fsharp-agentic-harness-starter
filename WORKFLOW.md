@@ -67,7 +67,7 @@ Turn an eligible issue into either:
 - `poll-once` dispatches up to `orchestrator.max_concurrency` active issues concurrently.
 - `serve` reuses the same active-state dispatch rules on repeated ticks and schedules retries with linear backoff equal to `orchestrator.poll_interval_seconds * attempt_number`.
 - `status` reads the latest `.harness/runtime/status.json` snapshot, and `serve` appends structured events to `.harness/runtime/host-events.jsonl`.
-- `run-issue` and `poll-once` only dispatch issues currently in `tracker.active_states`; non-active issues are rejected for new runs.
+- `run-issue` and `poll-once` only dispatch issues currently in `tracker.active_states`; file-backed issues with unresolved `depends_on` prerequisites are also rejected for new runs.
 - Supported `agent.args` tokens are `{workspace}`, `{issue_id}`, `{issue_title}`, `{request_path}`, and `{project_root}`.
 - Prefer whole-value environment-variable expansion such as `$MY_AGENT_COMMAND` for machine-specific command paths in front matter.
 - Active runs keep the workflow they were dispatched with; reloads only affect future ticks and future runs.
@@ -75,7 +75,7 @@ Turn an eligible issue into either:
 
 ## Tracker adapter notes
 
-- `tracker.kind: file` uses `tracker.path` as a repo-local issue directory and remains the default proving path for this starter.
+- `tracker.kind: file` uses `tracker.path` as a repo-local issue directory, enforces `depends_on` for candidate admission, and can optionally write issue-state transitions when `tracker.write_state_transitions: true` is enabled.
 - `tracker.kind: linear` treats `tracker.project_key` as the Linear team key, requires `tracker.api_key` to be an environment-variable reference, and uses `tracker.api_url` only when you need to override the default `https://api.linear.app/graphql` endpoint.
 - The current Linear adapter is read-only and supports issue listing, candidate fetch, per-issue refresh, and terminal-issue listing.
 - Linear issues populate `issue.id`, `issue.title`, `issue.description`, `issue.state`, and normalized priority/update metadata; `issue.acceptance`, `issue.validation`, and `issue.constraints` remain empty in this pass unless the repo keeps using file-backed issues for that structured metadata.
@@ -103,6 +103,11 @@ Turn an eligible issue into either:
   - workflow prompt body
   - `tracker.active_states`
   - `tracker.terminal_states`
+  - `tracker.dependency_satisfied_states`
+  - `tracker.write_state_transitions`
+  - `tracker.claim_state`
+  - `tracker.success_state`
+  - `tracker.failure_state`
   - `workspace.cleanup_terminal`
   - `orchestrator.poll_interval_seconds`
   - `orchestrator.max_concurrency`
@@ -129,14 +134,14 @@ Turn an eligible issue into either:
 
 ## Canonical issue-state policy
 
-- `Todo` means admitted and runnable. In the default starter, it is an active state.
-- `In Progress` means a human has intentionally claimed work in the tracker. It is also an active state by default. The current starter host does not write tracker state automatically.
+- `Todo` means admitted and runnable when any declared `depends_on` prerequisites are already in `tracker.dependency_satisfied_states`. In the default starter, it is an active state.
+- `In Progress` means work has been claimed in the tracker. It is also an active state by default. When `tracker.write_state_transitions` is enabled for `tracker.kind: file`, the starter sets this state automatically on dispatch using `tracker.claim_state`.
 - `Blocked` means the issue is not currently runnable because external input, a prerequisite, or a policy decision is missing. It is non-active by default.
-- `Human Review` is the review-ready state if a repo chooses to use one. In this starter it is non-active unless the repo explicitly adds it to `tracker.active_states`.
+- `Human Review` is the review-ready state if a repo chooses to use one. In this starter it is non-active unless the repo explicitly adds it to `tracker.active_states`, and it can be used as `tracker.success_state` when a repo wants review-ready automatic completion without auto-closing to `Done`.
 - `Rework` and `Merging` are optional repo-owned coordination states. In this starter they are non-active unless the repo explicitly adds them to `tracker.active_states`.
 - `Done`, `Closed`, and `Cancelled` are the default terminal states. They are never dispatched for new work.
-- The starter reads issue state but does not automatically write tracker transitions. State changes remain human-operated repo/tracker edits; host mode only reacts to them.
-- Retries are host-owned during `serve`: failed active issues are retried with linear backoff until `orchestrator.max_attempts` is reached, and unchanged successful or exhausted active issues are not redispatched again until the tracker issue changes.
+- By default, state changes remain human-operated repo/tracker edits. If `tracker.kind: file` and `tracker.write_state_transitions: true` are enabled, the starter writes `tracker.claim_state` on dispatch, `tracker.success_state` after a successful completion, and `tracker.failure_state` after an exhausted failure.
+- Retries are host-owned during `serve`: failed active issues are retried with linear backoff until `orchestrator.max_attempts` is reached, dependency-blocked retries wait until their prerequisites satisfy `tracker.dependency_satisfied_states`, and unchanged successful or exhausted active issues are not redispatched again until the tracker issue changes.
 - If `workspace.cleanup_terminal` is enabled, terminal workspaces may be removed during cleanup-oriented commands. Non-terminal, non-active states are preserved rather than auto-cleaned.
 
 ## Evidence bar

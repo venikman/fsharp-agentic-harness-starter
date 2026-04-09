@@ -62,6 +62,11 @@ type WorkflowConfig =
       TrackerApiKeyIsEnvBacked: bool
       ActiveStates: string list
       TerminalStates: string list
+      DependencySatisfiedStates: string list
+      WriteStateTransitions: bool
+      ClaimState: string
+      SuccessState: string
+      FailureState: string
       WorkspaceRoot: string
       CleanupTerminalWorkspaces: bool
       PollIntervalSeconds: int
@@ -85,6 +90,7 @@ type TrackerIssue =
       Description: string
       State: IssueState
       Priority: int
+      DependsOn: string list
       Acceptance: string list
       Validation: string list
       Constraints: string list
@@ -96,7 +102,8 @@ type TrackerPort =
       ListCandidateIssues: unit -> Result<TrackerIssue list, string>
       TryFindById: string -> Result<TrackerIssue option, string>
       TryRefreshById: string -> Result<TrackerIssue option, string>
-      ListTerminalIssues: unit -> Result<TrackerIssue list, string> }
+      ListTerminalIssues: unit -> Result<TrackerIssue list, string>
+      TryUpdateState: string -> string -> Result<TrackerIssue option, string> }
 
 type WorkspaceInfo =
     { Key: string

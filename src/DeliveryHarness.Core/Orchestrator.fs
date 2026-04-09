@@ -311,21 +311,73 @@ module Orchestrator =
         else
             Error (sprintf "%s (run record: %s)" completion.Summary completion.RecordPath)
 
+    let private claimIssueIfConfigured (workflow: WorkflowDefinition) (issue: TrackerIssue) =
+        if not workflow.Config.WriteStateTransitions then
+            Ok issue
+        else
+            match Tracker.tryUpdateState workflow issue.Id workflow.Config.ClaimState with
+            | Error error ->
+                Error(
+                    sprintf
+                        "Could not claim issue '%s' by setting state to '%s': %s"
+                        issue.Id
+                        workflow.Config.ClaimState
+                        error
+                )
+            | Ok None -> Error(sprintf "Issue '%s' disappeared before it could be claimed." issue.Id)
+            | Ok (Some claimedIssue) -> Ok claimedIssue
+
+    let private finalizeIssueStateIfConfigured (workflow: WorkflowDefinition) (completion: RunCompletion) (issue: TrackerIssue) =
+        let transitionTo stateName =
+            match Tracker.tryUpdateState workflow issue.Id stateName with
+            | Error error ->
+                Error(
+                    sprintf
+                        "Run finished but could not set issue '%s' to '%s': %s (run record: %s)"
+                        issue.Id
+                        stateName
+                        error
+                        completion.RecordPath
+                )
+            | Ok None ->
+                Error(
+                    sprintf
+                        "Run finished but issue '%s' disappeared before it could be set to '%s'. (run record: %s)"
+                        issue.Id
+                        stateName
+                        completion.RecordPath
+                )
+            | Ok (Some updatedIssue) -> Ok updatedIssue
+
+        if not workflow.Config.WriteStateTransitions || completion.Cancelled then
+            Ok issue
+        elif completion.Succeeded then
+            transitionTo workflow.Config.SuccessState
+        elif completion.AttemptNumber >= workflow.Config.MaxAttempts then
+            transitionTo workflow.Config.FailureState
+        else
+            Ok issue
+
     let runIssue (workflow: WorkflowDefinition) (issue: TrackerIssue) : Result<string, string> =
         match ensureRunnableWorkflow workflow with
         | Error error -> Error error
         | Ok () ->
-            runIssueAttempt workflow issue 1 1 (fun () -> None) CancellationToken.None
-            |> toUserResult
+            match claimIssueIfConfigured workflow issue with
+            | Error error -> Error error
+            | Ok claimedIssue ->
+                let completion = runIssueAttempt workflow claimedIssue 1 1 (fun () -> None) CancellationToken.None
+
+                match finalizeIssueStateIfConfigured workflow completion claimedIssue with
+                | Error error -> Error error
+                | Ok _ -> toUserResult completion
 
     let runIssueById (workflow: WorkflowDefinition) (issueId: string) =
-        match Tracker.tryFindById workflow issueId with
+        match Tracker.listIssues workflow with
         | Error error -> Error error
-        | Ok None -> Error (sprintf "Issue '%s' was not found." issueId)
-        | Ok (Some issue) ->
-            if Workflow.isActive workflow issue then
-                runIssue workflow issue
-            else
+        | Ok issues ->
+            match issues |> List.tryFind (fun issue -> String.Equals(issue.Id, issueId, StringComparison.OrdinalIgnoreCase)) with
+            | None -> Error (sprintf "Issue '%s' was not found." issueId)
+            | Some issue when not (Workflow.isActive workflow issue) ->
                 Error(
                     sprintf
                         "Issue '%s' is in state '%s' and is not runnable. Active states: %s"
@@ -333,6 +385,18 @@ module Orchestrator =
                         issue.State.AsText
                         (String.concat ", " workflow.Config.ActiveStates)
                 )
+            | Some issue ->
+                let blockers = Tracker.dependencyBlockers workflow issues issue
+
+                if not (List.isEmpty blockers) then
+                    Error(
+                        sprintf
+                            "Issue '%s' is blocked by unresolved dependencies: %s"
+                            issue.Id
+                            (String.concat ", " blockers)
+                    )
+                else
+                    runIssue workflow issue
 
     let private reconcileTerminalWorkspacesExcept (workflow: WorkflowDefinition) (excludedIds: Set<string>) =
         if not workflow.Config.CleanupTerminalWorkspaces then
@@ -619,6 +683,66 @@ module Orchestrator =
         else
             false
 
+    let private transitionIssueStateInHost runtime issue attemptNumber turnNumber workspacePath transitionEventType stateName =
+        match Tracker.tryUpdateState runtime.Workflow issue.Id stateName with
+        | Error error ->
+            logEvent
+                runtime.Workflow
+                "error"
+                (transitionEventType + "_failed")
+                (sprintf "Could not set issue '%s' to '%s': %s" issue.Id stateName error)
+                (Some issue.Id)
+                (Some attemptNumber)
+                (Some turnNumber)
+                None
+                (Some workspacePath)
+
+            Error error
+        | Ok None ->
+            let error = sprintf "Issue '%s' disappeared before it could be set to '%s'." issue.Id stateName
+
+            logEvent
+                runtime.Workflow
+                "error"
+                (transitionEventType + "_failed")
+                error
+                (Some issue.Id)
+                (Some attemptNumber)
+                (Some turnNumber)
+                None
+                (Some workspacePath)
+
+            Error error
+        | Ok (Some updatedIssue) ->
+            logEvent
+                runtime.Workflow
+                "info"
+                transitionEventType
+                (sprintf "Set issue '%s' to '%s'." issue.Id stateName)
+                (Some issue.Id)
+                (Some attemptNumber)
+                (Some turnNumber)
+                None
+                (Some workspacePath)
+
+            Ok updatedIssue
+
+    let private claimIssueForHost runtime issue attemptNumber turnNumber workspacePath =
+        if runtime.Workflow.Config.WriteStateTransitions then
+            transitionIssueStateInHost runtime issue attemptNumber turnNumber workspacePath "issue_claimed" runtime.Workflow.Config.ClaimState
+        else
+            Ok issue
+
+    let private finalizeIssueStateInHost runtime issue attemptNumber turnNumber workspacePath succeeded exhausted cancelled =
+        if not runtime.Workflow.Config.WriteStateTransitions || cancelled then
+            Ok issue
+        elif succeeded then
+            transitionIssueStateInHost runtime issue attemptNumber turnNumber workspacePath "issue_transitioned" runtime.Workflow.Config.SuccessState
+        elif exhausted then
+            transitionIssueStateInHost runtime issue attemptNumber turnNumber workspacePath "issue_transitioned" runtime.Workflow.Config.FailureState
+        else
+            Ok issue
+
     let private stopRunningIssue (runtime: HostRuntime) (entry: RunningEntry) reason stopBehavior eventType =
         if not entry.CancellationTokenSource.IsCancellationRequested then
             entry.StopReason := Some reason
@@ -640,52 +764,57 @@ module Orchestrator =
         let startedAtUtc = DateTimeOffset.UtcNow
         let dispatchedWorkflow = runtime.Workflow
         let workspacePath = Workspace.workspacePathForIssue dispatchedWorkflow issue.Id
-        let cancellationSource = new CancellationTokenSource()
-        let stopReason = ref None
 
-        let task =
-            Task.Run(fun () ->
-                try
-                    runIssueAttempt
-                        dispatchedWorkflow
-                        issue
-                        attemptNumber
-                        1
-                        (fun () -> !stopReason)
-                        cancellationSource.Token
-                with ex ->
-                    { Succeeded = false
-                      Cancelled = false
-                      Status = "Failed"
-                      Issue = issue
-                      Summary = ex.Message
-                      RecordPath = ""
-                      WorkspacePath = workspacePath
-                      AttemptNumber = attemptNumber
-                      TurnNumber = 1 })
+        match claimIssueForHost runtime issue attemptNumber 1 workspacePath with
+        | Error summary ->
+            retireIssue runtime issue summary
+        | Ok claimedIssue ->
+            let cancellationSource = new CancellationTokenSource()
+            let stopReason = ref None
 
-        runtime.Running.[issue.Id] <-
-            { Issue = issue
-              WorkflowAtDispatch = dispatchedWorkflow
-              AttemptNumber = attemptNumber
-              TurnNumber = 1
-              StartedAtUtc = startedAtUtc
-              WorkspacePath = workspacePath
-              CancellationTokenSource = cancellationSource
-              StopReason = stopReason
-              StopBehavior = PreserveWorkspace
-              Task = task }
+            let task =
+                Task.Run(fun () ->
+                    try
+                        runIssueAttempt
+                            dispatchedWorkflow
+                            claimedIssue
+                            attemptNumber
+                            1
+                            (fun () -> !stopReason)
+                            cancellationSource.Token
+                    with ex ->
+                        { Succeeded = false
+                          Cancelled = false
+                          Status = "Failed"
+                          Issue = claimedIssue
+                          Summary = ex.Message
+                          RecordPath = ""
+                          WorkspacePath = workspacePath
+                          AttemptNumber = attemptNumber
+                          TurnNumber = 1 })
 
-        logEvent
-            dispatchedWorkflow
-            "info"
-            "issue_dispatched"
-            (sprintf "Dispatched issue '%s'." issue.Id)
-            (Some issue.Id)
-            (Some attemptNumber)
-            (Some 1)
-            None
-            (Some workspacePath)
+            runtime.Running.[claimedIssue.Id] <-
+                { Issue = claimedIssue
+                  WorkflowAtDispatch = dispatchedWorkflow
+                  AttemptNumber = attemptNumber
+                  TurnNumber = 1
+                  StartedAtUtc = startedAtUtc
+                  WorkspacePath = workspacePath
+                  CancellationTokenSource = cancellationSource
+                  StopReason = stopReason
+                  StopBehavior = PreserveWorkspace
+                  Task = task }
+
+            logEvent
+                dispatchedWorkflow
+                "info"
+                "issue_dispatched"
+                (sprintf "Dispatched issue '%s'." claimedIssue.Id)
+                (Some claimedIssue.Id)
+                (Some attemptNumber)
+                (Some 1)
+                None
+                (Some workspacePath)
 
     let private processCompletedRuns (runtime: HostRuntime) =
         let completedIds =
@@ -713,33 +842,50 @@ module Orchestrator =
                       TurnNumber = entry.TurnNumber }
 
             let issueSnapshot = entry.Issue
+            let exhausted = not completion.Succeeded && not completion.Cancelled && completion.AttemptNumber >= runtime.Workflow.Config.MaxAttempts
+
+            let retiredIssue, completionSummary =
+                match
+                    finalizeIssueStateInHost
+                        runtime
+                        issueSnapshot
+                        completion.AttemptNumber
+                        completion.TurnNumber
+                        entry.WorkspacePath
+                        completion.Succeeded
+                        exhausted
+                        completion.Cancelled
+                with
+                | Ok updatedIssue -> updatedIssue, completion.Summary
+                | Error error ->
+                    issueSnapshot, String.concat Environment.NewLine [ completion.Summary; sprintf "Tracker state transition failed: %s" error ]
 
             logEvent
                 entry.WorkflowAtDispatch
                 (if completion.Succeeded then "info" elif completion.Cancelled then "warning" else "error")
                 "run_completed"
-                completion.Summary
-                (Some issueSnapshot.Id)
+                completionSummary
+                (Some retiredIssue.Id)
                 (Some completion.AttemptNumber)
                 (Some completion.TurnNumber)
                 (if String.IsNullOrWhiteSpace completion.RecordPath then None else Some completion.RecordPath)
                 (Some completion.WorkspacePath)
 
             if completion.Succeeded then
-                retireIssue runtime issueSnapshot completion.Summary
+                retireIssue runtime retiredIssue completionSummary
             elif completion.Cancelled then
-                retireIssue runtime issueSnapshot completion.Summary
+                retireIssue runtime retiredIssue completionSummary
 
                 match entry.StopBehavior with
                 | CleanupWorkspace ->
-                    match Workspace.removeIfExists runtime.Workflow issueSnapshot.Id with
+                    match Workspace.removeIfExists runtime.Workflow retiredIssue.Id with
                     | Ok () ->
                         logEvent
                             runtime.Workflow
                             "info"
                             "workspace_cleaned"
-                            (sprintf "Cleaned workspace for terminal issue '%s'." issueSnapshot.Id)
-                            (Some issueSnapshot.Id)
+                            (sprintf "Cleaned workspace for terminal issue '%s'." retiredIssue.Id)
+                            (Some retiredIssue.Id)
                             (Some completion.AttemptNumber)
                             (Some completion.TurnNumber)
                             None
@@ -750,7 +896,7 @@ module Orchestrator =
                             "error"
                             "workspace_cleanup_failed"
                             error
-                            (Some issueSnapshot.Id)
+                            (Some retiredIssue.Id)
                             (Some completion.AttemptNumber)
                             (Some completion.TurnNumber)
                             None
@@ -761,11 +907,11 @@ module Orchestrator =
                     let nextAttemptNumber = completion.AttemptNumber + 1
                     let nextAttemptAtUtc = DateTimeOffset.UtcNow + backoffDelay runtime.Workflow completion.AttemptNumber
 
-                    runtime.Retrying.[issueSnapshot.Id] <-
-                        { Issue = issueSnapshot
+                    runtime.Retrying.[retiredIssue.Id] <-
+                        { Issue = retiredIssue
                           NextAttemptNumber = nextAttemptNumber
                           NextAttemptAtUtc = nextAttemptAtUtc
-                          LastSummary = completion.Summary }
+                          LastSummary = completionSummary }
 
                     logEvent
                         runtime.Workflow
@@ -774,22 +920,22 @@ module Orchestrator =
                         (sprintf
                             "Retry %d for issue '%s' scheduled at %s."
                             nextAttemptNumber
-                            issueSnapshot.Id
+                            retiredIssue.Id
                             (nextAttemptAtUtc.ToString("O")))
-                        (Some issueSnapshot.Id)
+                        (Some retiredIssue.Id)
                         (Some nextAttemptNumber)
                         (Some completion.TurnNumber)
                         (if String.IsNullOrWhiteSpace completion.RecordPath then None else Some completion.RecordPath)
                         (Some entry.WorkspacePath)
                 else
-                    retireIssue runtime issueSnapshot completion.Summary
+                    retireIssue runtime retiredIssue completionSummary
 
                     logEvent
                         runtime.Workflow
                         "warning"
                         "retry_exhausted"
-                        (sprintf "Issue '%s' exhausted %d attempt(s)." issueSnapshot.Id completion.AttemptNumber)
-                        (Some issueSnapshot.Id)
+                        (sprintf "Issue '%s' exhausted %d attempt(s)." retiredIssue.Id completion.AttemptNumber)
+                        (Some retiredIssue.Id)
                         (Some completion.AttemptNumber)
                         (Some completion.TurnNumber)
                         (if String.IsNullOrWhiteSpace completion.RecordPath then None else Some completion.RecordPath)
@@ -944,8 +1090,52 @@ module Orchestrator =
 
                         loop remaining rest
                     else
-                        startIssueRun runtime refreshedIssue retryEntry.NextAttemptNumber
-                        loop (remaining - 1) rest
+                        match Tracker.listIssues runtime.Workflow with
+                        | Error error ->
+                            runtime.Retrying.[issueId] <-
+                                { retryEntry with
+                                    Issue = refreshedIssue
+                                    NextAttemptAtUtc = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(float runtime.Workflow.Config.PollIntervalSeconds) }
+
+                            logEvent
+                                runtime.Workflow
+                                "error"
+                                "retry_dependency_check_failed"
+                                error
+                                (Some issueId)
+                                (Some retryEntry.NextAttemptNumber)
+                                (Some 1)
+                                None
+                                None
+
+                            loop remaining rest
+                        | Ok issues ->
+                            let blockers = Tracker.dependencyBlockers runtime.Workflow issues refreshedIssue
+
+                            if not (List.isEmpty blockers) then
+                                runtime.Retrying.[issueId] <-
+                                    { retryEntry with
+                                        Issue = refreshedIssue
+                                        NextAttemptAtUtc = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(float runtime.Workflow.Config.PollIntervalSeconds) }
+
+                                logEvent
+                                    runtime.Workflow
+                                    "info"
+                                    "retry_waiting_on_dependencies"
+                                    (sprintf
+                                        "Retry for issue '%s' is waiting on dependencies: %s"
+                                        issueId
+                                        (String.concat ", " blockers))
+                                    (Some issueId)
+                                    (Some retryEntry.NextAttemptNumber)
+                                    (Some 1)
+                                    None
+                                    None
+
+                                loop remaining rest
+                            else
+                                startIssueRun runtime refreshedIssue retryEntry.NextAttemptNumber
+                                loop (remaining - 1) rest
 
         loop availableSlots dueRetryIds
 

@@ -51,14 +51,15 @@ The starter is intentionally thin:
 6. Writes an agent request into the workspace.
 7. Supports both `dry-run` and generic external worker commands.
 8. Stores structured run records under `./.harness/runs/` for both success and failure paths once a run starts.
-9. Dispatches up to `orchestrator.max_concurrency` active issues concurrently during `poll-once` and `serve`.
+9. Dispatches up to `orchestrator.max_concurrency` active issues concurrently during `poll-once` and `serve`, while respecting file-backed `depends_on` prerequisites.
 10. Exposes `serve` for long-running host mode and `status` for reading the latest runtime snapshot.
 11. Retries failed host-mode attempts with linear backoff while respecting `orchestrator.max_attempts`.
 12. Reconciles running work against tracker state and applies terminal-workspace cleanup according to policy.
-13. Writes structured host logs and status snapshots under `./.harness/runtime/`.
-14. Hot-reloads `WORKFLOW.md` for future ticks/runs while preserving the last known good config on invalid reloads.
-15. Supports strict `{{ ... }}` prompt templates with a documented compatibility path for legacy workflow bodies.
-16. Redacts workflow-configured secret-like env values from operator-visible summaries and default transcripts without truncating output by default.
+13. Optionally writes file-backed tracker state transitions on dispatch, success, and exhausted failure when enabled in `WORKFLOW.md`.
+14. Writes structured host logs and status snapshots under `./.harness/runtime/`.
+15. Hot-reloads `WORKFLOW.md` for future ticks/runs while preserving the last known good config on invalid reloads.
+16. Supports strict `{{ ... }}` prompt templates with a documented compatibility path for legacy workflow bodies.
+17. Redacts workflow-configured secret-like env values from operator-visible summaries and default transcripts without truncating output by default.
 
 ## Quick start
 
@@ -147,8 +148,29 @@ Notes:
 - one external worker invocation still equals one turn, so `agent.max_turns` must stay `1` until a continuation-capable worker runtime exists
 - retries are host-mode behavior; `run-issue` and `poll-once` remain one-shot commands
 - host scheduling state is in-memory only; restart recovery comes from re-reading tracker state and reusing deterministic workspaces
-- issue `depends_on` and `fpf.*` metadata are repo-delivery metadata today; the local starter runtime does not enforce them
-- the Linear adapter is intentionally read-only in this pass; tracker comments, state writes, and PR-link automation remain out of scope
+- file-backed `depends_on` is enforced for candidate admission, but the starter still does not auto-land or merge completed workspace changes into the project root
+- the Linear adapter is intentionally read-only in this pass; tracker comments, dependency metadata, state writes, and PR-link automation remain out of scope there
+
+## Review-gated autonomous file-backed mode
+
+If you want to start `serve` once, let the harness choose issues itself, and keep a human review/landing gate between dependency steps, use file-backed tracker settings like:
+
+```md
+tracker.dependency_satisfied_states:
+  - Done
+tracker.write_state_transitions: true
+tracker.claim_state: In Progress
+tracker.success_state: Human Review
+tracker.failure_state: Blocked
+```
+
+With that setup:
+
+- `serve` claims runnable file-backed issues automatically
+- successful runs transition to `Human Review`
+- failed exhausted runs transition to `Blocked`
+- dependent issues do not start until their prerequisites are moved to `Done`
+- leaving `serve` running lets the host continue automatically after you review, land, and mark prerequisites done
 
 ## Worker modes you can use today
 
@@ -204,14 +226,15 @@ See `docs/exec-plans/completed/DEMO-HARNESS-BACKLOG-ROLLOUT.md` for dependencies
 ## Recommended daily workflow
 
 1. Add or update issue files in `tracker/issues/`.
-2. Keep `WORKFLOW.md` on built-in `dry-run` until you are ready to switch to a real worker.
-3. Run:
+2. Decide whether to keep human-operated tracker states or enable file-backed state transitions in `WORKFLOW.md` with `tracker.write_state_transitions: true`.
+3. Keep `WORKFLOW.md` on built-in `dry-run` until you are ready to switch to a real worker.
+4. Run:
    ```bash
    dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- validate-workflow
    dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- list-issues
    dotnet run --project src/DeliveryHarness.Cli/DeliveryHarness.Cli.fsproj -- poll-once
    ```
-4. Inspect:
+5. Inspect:
    - `.harness/runs/*.json`
    - `.workspaces/<issue-id>/.harness/agent-request.md`
    - `.workspaces/<issue-id>/.harness/agent-output.txt` or `dry-run.txt`
@@ -226,7 +249,7 @@ See `docs/exec-plans/completed/DEMO-HARNESS-BACKLOG-ROLLOUT.md` for dependencies
 - The file tracker remains deliberate as the default path. It lets you debug your harness before you involve external APIs, credentials, and rate limits, even though the read-only Linear adapter now exists.
 - Runtime policy stays in harness-owned files. This repo should not depend on checked-in `.pi/` settings for correctness.
 - Prefer whole-value environment-variable expansion in `WORKFLOW.md` for machine-specific command paths.
-- Use `list-issues` to choose an id from `tracker.active_states`; `run-issue` rejects non-active issues.
+- Use `list-issues` to choose an id from `tracker.active_states`; `run-issue` also rejects file-backed issues with unresolved `depends_on` prerequisites.
 - Run records under `.harness/runs/` are written for both success and failure paths when a run attempt starts.
 - `serve` writes `.harness/runtime/host-events.jsonl` and `.harness/runtime/status.json`; `status` reads the latest snapshot.
 - `WORKFLOW.md` is the canonical location for the issue-state policy, host reload contract, and prompt-template contract. This README is only a pointer.

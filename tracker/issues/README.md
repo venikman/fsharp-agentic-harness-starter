@@ -8,8 +8,8 @@ This directory is the harness-owned backlog for the current starter.
 - `README.md` in this directory is documentation only and is ignored by the file tracker.
 - Runtime policy belongs in harness-owned files such as `WORKFLOW.md`, `docs/*`, and harness-managed environment variables.
 - Do not add checked-in `.pi/` settings or pi package configuration as required runtime state for this repository.
-- Today the starter runtime reads `id`, `title`, `state`, `priority`, `acceptance`, `validation`, `constraints`, and the body text.
-- `depends_on` and `fpf.*` fields are still useful repo-delivery metadata, but the current local starter does not schedule or block on them.
+- Today the starter runtime reads `id`, `title`, `state`, `priority`, `depends_on`, `acceptance`, `validation`, `constraints`, and the body text.
+- For `tracker.kind: file`, `depends_on` is enforced for candidate admission and manual `run-issue` dispatch. `fpf.*` fields remain repo-delivery metadata only.
 
 ## Current rollout order
 
@@ -18,6 +18,7 @@ This directory is the harness-owned backlog for the current starter.
 3. `DEMO-0005`, `DEMO-0006`, `DEMO-0007`, `DEMO-0008`, `DEMO-0011`, `DEMO-0012` — completed host/runtime and workflow-contract baseline references
 4. `DEMO-0009` — completed optional external-tracker baseline reference if the repo needs more than the file-backed proving path
 5. `DEMO-9999` — completed trusted-local release-proof reference for the final one-start verification pass
+6. `DEMO-0013` — completed follow-up reference for file-backed dependency admission and optional tracker state transitions
 
 For the fuller dependency map, read:
 - `docs/exec-plans/completed/DEMO-HARNESS-BACKLOG-ROLLOUT.md`
@@ -27,5 +28,5 @@ For the fuller dependency map, read:
 - Keep acceptance measurable.
 - Keep validation commands exact.
 - Record scope constraints explicitly.
-- Mention prerequisite issues in the body when a task is not safe to run early.
+- Use `depends_on` for real prerequisite gating in file-backed mode and mention any nuance in the body when a task is not safe to run early.
 - Keep file-backed tracker support working until a specific issue authorizes replacing it.

@@ -154,6 +154,14 @@ module Workflow =
                 else
                     configured
 
+            let dependencySatisfiedStates =
+                let configured = FrontMatter.getList "tracker.dependency_satisfied_states" doc
+
+                if List.isEmpty configured then
+                    terminalStates
+                else
+                    configured
+
             let trackerPath =
                 let configured = getOneOrDefault "tracker.path" "tracker/issues" doc
 
@@ -186,6 +194,11 @@ module Workflow =
                   TrackerApiKeyIsEnvBacked = trackerApiKeyIsEnvBacked
                   ActiveStates = activeStates
                   TerminalStates = terminalStates
+                  DependencySatisfiedStates = dependencySatisfiedStates
+                  WriteStateTransitions = FrontMatter.getBool "tracker.write_state_transitions" false doc
+                  ClaimState = getOneOrDefault "tracker.claim_state" "In Progress" doc
+                  SuccessState = getOneOrDefault "tracker.success_state" "Human Review" doc
+                  FailureState = getOneOrDefault "tracker.failure_state" "Blocked" doc
                   WorkspaceRoot = resolvePath baseDir (getOneOrDefault "workspace.root" ".workspaces" doc)
                   CleanupTerminalWorkspaces = FrontMatter.getBool "workspace.cleanup_terminal" false doc
                   PollIntervalSeconds = FrontMatter.getInt "orchestrator.poll_interval_seconds" 60 doc
@@ -237,6 +250,28 @@ module Workflow =
           | _ ->
               yield sprintf "Tracker kind '%s' is not implemented in this starter yet." workflow.Config.TrackerKind
 
+          if workflow.Config.DependencySatisfiedStates |> List.exists String.IsNullOrWhiteSpace then
+              yield "tracker.dependency_satisfied_states must not contain blank values."
+
+          if workflow.Config.WriteStateTransitions then
+              if not (String.Equals(workflow.Config.TrackerKind, "file", StringComparison.OrdinalIgnoreCase)) then
+                  yield "tracker.write_state_transitions is only supported for tracker.kind: file in this starter."
+
+              if String.IsNullOrWhiteSpace workflow.Config.ClaimState then
+                  yield "tracker.claim_state is required when tracker.write_state_transitions is true."
+              elif not (workflow.Config.ActiveStates |> List.exists (fun state -> String.Equals(state, workflow.Config.ClaimState, StringComparison.OrdinalIgnoreCase))) then
+                  yield "tracker.claim_state must be one of tracker.active_states when tracker.write_state_transitions is true."
+
+              if String.IsNullOrWhiteSpace workflow.Config.SuccessState then
+                  yield "tracker.success_state is required when tracker.write_state_transitions is true."
+              elif workflow.Config.ActiveStates |> List.exists (fun state -> String.Equals(state, workflow.Config.SuccessState, StringComparison.OrdinalIgnoreCase)) then
+                  yield "tracker.success_state must not be an active state when tracker.write_state_transitions is true."
+
+              if String.IsNullOrWhiteSpace workflow.Config.FailureState then
+                  yield "tracker.failure_state is required when tracker.write_state_transitions is true."
+              elif workflow.Config.ActiveStates |> List.exists (fun state -> String.Equals(state, workflow.Config.FailureState, StringComparison.OrdinalIgnoreCase)) then
+                  yield "tracker.failure_state must not be an active state when tracker.write_state_transitions is true."
+
           if String.IsNullOrWhiteSpace workflow.Config.AgentCommand then
               yield "agent.command is required."
 
@@ -283,10 +318,12 @@ module Workflow =
           yield! validateHook workflow "after_run" workflow.Config.Hooks.AfterRun
           yield! validateHook workflow "before_remove" workflow.Config.Hooks.BeforeRemove ]
 
+    let private containsState (states: string list) (value: string) =
+        states
+        |> List.exists (fun state -> String.Equals(state, value, StringComparison.OrdinalIgnoreCase))
+
     let isActive (workflow: WorkflowDefinition) (issue: TrackerIssue) =
-        workflow.Config.ActiveStates
-        |> List.exists (fun state -> String.Equals(state, issue.State.AsText, StringComparison.OrdinalIgnoreCase))
+        containsState workflow.Config.ActiveStates issue.State.AsText
 
     let isTerminal (workflow: WorkflowDefinition) (issue: TrackerIssue) =
-        workflow.Config.TerminalStates
-        |> List.exists (fun state -> String.Equals(state, issue.State.AsText, StringComparison.OrdinalIgnoreCase))
+        containsState workflow.Config.TerminalStates issue.State.AsText

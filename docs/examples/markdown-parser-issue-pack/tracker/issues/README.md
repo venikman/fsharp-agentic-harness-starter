@@ -8,7 +8,7 @@ This directory is a copy-ready `tracker/issues/` pack for a separate markdown pa
 - This `README.md` is documentation only and is ignored by the file tracker.
 - Keep target-product work in the target repo, not in the harness repo backlog.
 - The starter runtime reads `id`, `title`, `state`, `priority`, `acceptance`, `validation`, `constraints`, and the body text.
-- `depends_on` and `fpf.*` fields are planning metadata that help ordering and review even though the starter runtime does not enforce them.
+- In file-backed mode, `depends_on` participates in runtime admission checks. `fpf.*` fields still help ordering and review but remain planning metadata only.
 
 ## Suggested rollout order
 

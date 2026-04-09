@@ -236,6 +236,7 @@ query IssueById($id: String!) {
                                                   Description = description
                                                   State = IssueState.Parse stateName
                                                   Priority = priority
+                                                  DependsOn = []
                                                   Acceptance = []
                                                   Validation = []
                                                   Constraints = []
@@ -367,7 +368,10 @@ query IssueById($id: String!) {
               ListCandidateIssues = fun () -> fetchIssues transport settings (Some workflow.Config.ActiveStates)
               TryFindById = fun issueId -> tryFetchIssueById transport settings issueId
               TryRefreshById = fun issueId -> tryFetchIssueById transport settings issueId
-              ListTerminalIssues = fun () -> fetchIssues transport settings (Some workflow.Config.TerminalStates) })
+              ListTerminalIssues = fun () -> fetchIssues transport settings (Some workflow.Config.TerminalStates)
+              TryUpdateState =
+                fun _ _ ->
+                    Error "tracker.kind: linear is read-only in this starter and does not support state transitions." })
 
     let createPort (workflow: WorkflowDefinition) =
         createPortWithTransport defaultTransport workflow

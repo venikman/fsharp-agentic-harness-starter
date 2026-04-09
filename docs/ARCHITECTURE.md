@@ -47,7 +47,7 @@ issue file or tracker item
 
 ## Current baseline
 
-- tracker seam: `DeliveryHarness.Core/Tracker.fs` defines the harness-owned port; the default adapter remains file-backed markdown issues and a read-only Linear adapter is now available for external intake
+- tracker seam: `DeliveryHarness.Core/Tracker.fs` defines the harness-owned port; the default adapter remains file-backed markdown issues with dependency-aware candidate admission and optional state-transition writeback, and a read-only Linear adapter is available for external intake
 - workspace bootstrap: git-worktree provisioning in `tools/AfterCreate.fsx`, with reused workspaces left unchanged
 - agent runner: generic external process with `dry-run` default until a repo wires its real local worker command
 - orchestration mode: `run-issue`, `poll-once`, and `serve`; host mode keeps in-memory running/retrying/retired state, enforces bounded concurrency, performs linear retry backoff, and reconciles tracker state on each tick
@@ -62,7 +62,7 @@ issue file or tracker item
 1. keep repo docs concrete enough for unattended agents
 2. extend deterministic validation and smoke sample inputs as the harness contract evolves
 3. keep git-backed workspace provisioning and cleanup policy explicit as real repos adopt the starter
-4. preserve the file-backed proving path as the default local contract even when real tracker adapters such as the current read-only Linear path are enabled
+4. preserve the file-backed proving path as the default local contract even when real tracker adapters such as the current read-only Linear path are enabled, while keeping file-backed dependency gating and optional state transitions explicit in repo-owned workflow config
 5. prove the final trusted-local `DEMO-9999` startup/review bundle against the now-landed host/runtime contract
 6. add richer continuation-capable worker semantics only if the repo truly needs multi-turn orchestration
 
